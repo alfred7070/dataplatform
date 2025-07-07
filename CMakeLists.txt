@@ -1,0 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
+project(dataplatform)
+file(GLOB SRC_FILES src/*.cpp)
+add_executable(dataplatform main.cpp ${SRC_FILES})
