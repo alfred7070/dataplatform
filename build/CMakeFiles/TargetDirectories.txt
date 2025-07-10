@@ -1,0 +1,3 @@
+C:/Users/kanyu/projects/dataplatform/build/CMakeFiles/dataplatform.dir
+C:/Users/kanyu/projects/dataplatform/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/kanyu/projects/dataplatform/build/CMakeFiles/ZERO_CHECK.dir
