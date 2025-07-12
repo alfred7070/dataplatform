@@ -1,5 +1,8 @@
 #include "../headers/server.hpp"
-
+#include "../headers/check.hpp"
+#include "../headers/accept.hpp"
+Check check;
+Accept acceptor;
 Server::Server(ServerConfig config) : m_config(config)
 {
     if (WSAStartup(MAKEWORD(2, 2), &m_wsaData) != 0)
@@ -79,7 +82,7 @@ void Server::_listen()
         size_t header_end = request_str.find("\r\n\r\n");
         if (header_end == std::string::npos)
         {
-            std::string resp = createHttpResponse("{\"error\":\"400 Bad Request - no header end found\"}", "application/json", 400, "Bad Request");
+            std::string resp = acceptor.accept_data("{\"error\":\"400 Bad Request - no header end found\"}", "application/json", 400, "Bad Request");
             send(client_fd, resp.c_str(), (int)resp.size(), 0);
             closesocket(client_fd);
             continue;
@@ -137,22 +140,22 @@ void Server::_listen()
 
                 if ((int)full_request.size() < total_size)
                 {
-                    response = createHttpResponse("{\"error\":\"Incomplete POST body received\"}", "application/json", 400, "Bad Request");
+                    response = acceptor.accept_data("{\"error\":\"Incomplete POST body received\"}", "application/json", 400, "Bad Request");
                 }
                 else
                 {
                     std::vector<char> body(full_request.begin() + header_end + 4, full_request.begin() + header_end + 4 + content_length);
-                    response = handleBinaryPostRequest(path, body);
+                    response = check.check_data(path, body);
                 }
             }
             else
             {
-                response = createHttpResponse("{\"error\":\"405 Method Not Allowed\"}", "application/json", 405, "Method Not Allowed");
+                response = acceptor.accept_data("{\"error\":\"405 Method Not Allowed\"}", "application/json", 405, "Method Not Allowed");
             }
         }
         catch (const std::exception &e)
         {
-            response = createHttpResponse("{\"error\":\"" + std::string(e.what()) + "\"}", "application/json", 500, "Internal Server Error");
+            response = acceptor.accept_data("{\"error\":\"" + std::string(e.what()) + "\"}", "application/json", 500, "Internal Server Error");
         }
 
         send(client_fd, response.c_str(), (int)response.size(), 0);
@@ -188,32 +191,21 @@ std::string Server::getContentType(const std::string &path)
     return "text/plain";
 }
 
-std::string Server::createHttpResponse(const std::string &body, const std::string &contentType, int statusCode, const std::string &statusMessage)
-{
-    std::ostringstream oss;
-    oss << "HTTP/1.1 " << statusCode << " " << statusMessage << "\r\n";
-    oss << "Content-Type: " << contentType << "\r\n";
-    oss << "Content-Length: " << body.size() << "\r\n";
-    oss << "Connection: close\r\n\r\n";
-    oss << body;
-    return oss.str();
-}
-
 std::string Server::handleGetRequest(const std::string &path, const std::unordered_map<std::string, std::string> &queryParams)
 {
     if (path == "/api/data")
     {
         if (m_LastPostedData.empty())
         {
-            return createHttpResponse("{\"error\":\"No data posted yet\"}", "application/json", 404, "Not Found");
+            return acceptor.accept_data("{\"error\":\"No data posted yet\"}", "application/json", 404, "Not Found");
         }
-        return createHttpResponse(m_LastPostedData, "application/json", 200, "OK");
+        return acceptor.accept_data(m_LastPostedData, "application/json", 200, "OK");
     }
     else if (path == "/")
     {
         std::string content = readFile("./public/index.html");
-        return content.empty() ? createHttpResponse("{\"error\":\"index.html not found\"}", "application/json", 404, "Not Found")
-                               : createHttpResponse(content, "text/html", 200, "OK");
+        return content.empty() ? acceptor.accept_data("{\"error\":\"index.html not found\"}", "application/json", 404, "Not Found")
+                               : acceptor.accept_data(content, "text/html", 200, "OK");
     }
     else if (path == "/echo")
     {
@@ -227,71 +219,13 @@ std::string Server::handleGetRequest(const std::string &path, const std::unorder
             first = false;
         }
         body += "} }";
-        return createHttpResponse(body, "application/json", 200, "OK");
+        return acceptor.accept_data(body, "application/json", 200, "OK");
     }
     else if (path == "/welcome")
     {
-        return createHttpResponse("{\"message\":\"Welcome to my server!\"}", "application/json", 200, "OK");
+        return acceptor.accept_data("{\"message\":\"Welcome to my server!\"}", "application/json", 200, "OK");
     }
-    return createHttpResponse("{\"error\":\"404 Not Found\"}", "application/json", 404, "Not Found");
-}
-
-std::string Server::handleBinaryPostRequest(const std::string &path, const std::vector<char> &body)
-{
-    static int counter = 0;
-
-    std::string extension = "bin";
-
-    if (body.size() >= 4)
-    {
-        if ((unsigned char)body[0] == 0xFF && (unsigned char)body[1] == 0xD8)
-        {
-            extension = "jpg";
-        }
-        else if (body[0] == 0xEF && body[1] == 0xBB && body[2] == 0xBF)
-        {
-            extension = "csv";
-        }
-        else if ((unsigned char)body[0] == 0x25 && (unsigned char)body[1] == 0x50 && (unsigned char)body[2] == 0x44 && (unsigned char)body[3] == 0x46)
-        {
-            extension = "pdf";
-        }
-        else if (body[0] == 0x50 && body[1] == 0x4B &&
-                 body[2] == 0x03 && body[3] == 0x04)
-        {
-            std::string bodyStr(body.begin(), body.end());
-
-            if (bodyStr.find("word/document.xml") != std::string::npos)
-            {
-                extension = "docx";
-            }
-            else if (bodyStr.find("xl/workbook.xml") != std::string::npos)
-            {
-                extension = "xlsx";
-            }
-            else
-            {
-                extension = "zip";
-            }
-        }
-    }
-
-    std::string folder = "./uploads/" + extension;
-    std::filesystem::create_directories(folder);
-
-    std::string filename = folder + "/upload_" + std::to_string(counter++) + "." + extension;
-    std::ofstream ofs(filename, std::ios::binary);
-    if (!ofs.is_open())
-    {
-        return createHttpResponse("{\"error\":\"Failed to write file\"}", "application/json", 500, "Internal Server Error");
-    }
-
-    ofs.write(body.data(), body.size());
-    ofs.close();
-
-    std::ostringstream oss;
-    oss << "{ \"status\": \"file saved\", \"filename\": \"" << filename << "\", \"size\": " << body.size() << " }";
-    return createHttpResponse(oss.str(), "application/json", 200, "OK");
+    return acceptor.accept_data("{\"error\":\"404 Not Found\"}", "application/json", 404, "Not Found");
 }
 
 std::unordered_map<std::string, std::string> Server::parseQueryParams(const std::string &query)

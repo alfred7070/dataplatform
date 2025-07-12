@@ -40,14 +40,9 @@ private:
     WSADATA m_wsaData;
     std::string m_StaticDIR;
     ServerConfig m_config;
-
     std::string m_LastPostedData;
-
     std::string getContentType(const std::string& path);
-    std::string createHttpResponse(const std::string& body, const std::string& contentType, int statusCode = 200, const std::string& statusMessage = "OK");
-    std::string handleGetRequest(const std::string& path, const std::unordered_map<std::string, std::string>& queryParams);
-    std::string handlePostRequest(const std::string& path, const std::string& body);
-    std::string handleBinaryPostRequest(const std::string& path, const std::vector<char>& body);  // Added
+    std::string handleGetRequest(const std::string& path, const std::unordered_map<std::string, std::string>& queryParams);  
     std::unordered_map<std::string, std::string> parseQueryParams(const std::string& query);
 };
 
