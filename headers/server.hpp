@@ -4,6 +4,7 @@
 #include <WinSock2.h>
 #include <unordered_map>
 #include <string>
+#include <vector>             // Required for binary body (std::vector<char>)
 #include "utils.hpp"
 #include "log.hpp"
 
@@ -38,6 +39,7 @@ private:
     std::string createHttpResponse(const std::string& body, const std::string& contentType, int statusCode = 200, const std::string& statusMessage = "OK");
     std::string handleGetRequest(const std::string& path, const std::unordered_map<std::string, std::string>& queryParams);
     std::string handlePostRequest(const std::string& path, const std::string& body);
+    std::string handleBinaryPostRequest(const std::string& path, const std::vector<char>& body);  // Added
     std::unordered_map<std::string, std::string> parseQueryParams(const std::string& query);
 };
 
