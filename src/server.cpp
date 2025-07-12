@@ -1,16 +1,15 @@
 #include "../headers/server.hpp"
-#include <sstream>
-#include <fstream>
-#include <filesystem>
-#include <vector>
 
-Server::Server(ServerConfig config) : m_config(config) {
-    if (WSAStartup(MAKEWORD(2, 2), &m_wsaData) != 0) {
+Server::Server(ServerConfig config) : m_config(config)
+{
+    if (WSAStartup(MAKEWORD(2, 2), &m_wsaData) != 0)
+    {
         Error("WSA initialization failed.");
     }
 
     m_ServerFD = socket(config.socAF, config.socType, 0);
-    if (m_ServerFD == INVALID_SOCKET) {
+    if (m_ServerFD == INVALID_SOCKET)
+    {
         close("Socket creation failed.");
     }
 
@@ -19,47 +18,58 @@ Server::Server(ServerConfig config) : m_config(config) {
     m_Address.sin_addr.S_un.S_addr = INADDR_ANY;
     m_Address.sin_port = htons(config.PORT);
 
-    if (bind(m_ServerFD, (struct sockaddr*)&m_Address, m_Addrlen) == SOCKET_ERROR) {
+    if (bind(m_ServerFD, (struct sockaddr *)&m_Address, m_Addrlen) == SOCKET_ERROR)
+    {
         close("Bind failed.");
     }
 
-    if (listen(m_ServerFD, 3) == SOCKET_ERROR) {
+    if (listen(m_ServerFD, 3) == SOCKET_ERROR)
+    {
         close("Listen failed.");
     }
 
     Info("Server is listening on port " + std::to_string(config.PORT));
 
-    if (!std::filesystem::exists("./uploads")) {
+    if (!std::filesystem::exists("./uploads"))
+    {
         std::filesystem::create_directory("./uploads");
     }
 }
 
-void Server::setstaticDirectory(std::string path) {
+void Server::setstaticDirectory(std::string path)
+{
     m_StaticDIR = path;
 }
 
-std::vector<char> readFullRequest(SOCKET client_fd, int total_expected, const char* initial_buffer, int initial_len) {
+std::vector<char> readFullRequest(SOCKET client_fd, int total_expected, const char *initial_buffer, int initial_len)
+{
     std::vector<char> request_data(initial_buffer, initial_buffer + initial_len);
-    while ((int)request_data.size() < total_expected) {
+    while ((int)request_data.size() < total_expected)
+    {
         char temp_buffer[4096];
         int bytes = recv(client_fd, temp_buffer, sizeof(temp_buffer), 0);
-        if (bytes <= 0) break;
+        if (bytes <= 0)
+            break;
         request_data.insert(request_data.end(), temp_buffer, temp_buffer + bytes);
     }
     return request_data;
 }
 
-void Server::_listen() {
-    while (true) {
-        SOCKET client_fd = accept(m_ServerFD, (struct sockaddr*)&m_Address, &m_Addrlen);
-        if (client_fd == INVALID_SOCKET) {
+void Server::_listen()
+{
+    while (true)
+    {
+        SOCKET client_fd = accept(m_ServerFD, (struct sockaddr *)&m_Address, &m_Addrlen);
+        if (client_fd == INVALID_SOCKET)
+        {
             close("Accept failed.");
             return;
         }
 
         char buffer[4096];
         int bytes_received = recv(client_fd, buffer, sizeof(buffer), 0);
-        if (bytes_received <= 0) {
+        if (bytes_received <= 0)
+        {
             Error("Receive failed or connection closed.");
             closesocket(client_fd);
             continue;
@@ -67,7 +77,8 @@ void Server::_listen() {
 
         std::string request_str(buffer, bytes_received);
         size_t header_end = request_str.find("\r\n\r\n");
-        if (header_end == std::string::npos) {
+        if (header_end == std::string::npos)
+        {
             std::string resp = createHttpResponse("{\"error\":\"400 Bad Request - no header end found\"}", "application/json", 400, "Bad Request");
             send(client_fd, resp.c_str(), (int)resp.size(), 0);
             closesocket(client_fd);
@@ -78,7 +89,8 @@ void Server::_listen() {
         std::vector<std::string> lines = split(headers_str, '\n');
         std::vector<std::string> request_line = split(lines[0], ' ');
 
-        if (request_line.size() != 3) {
+        if (request_line.size() != 3)
+        {
             closesocket(client_fd);
             continue;
         }
@@ -90,17 +102,21 @@ void Server::_listen() {
 
         std::unordered_map<std::string, std::string> queryParams;
         size_t qmark = full_path.find('?');
-        if (qmark != std::string::npos) {
+        if (qmark != std::string::npos)
+        {
             path = full_path.substr(0, qmark);
             queryParams = parseQueryParams(full_path.substr(qmark + 1));
         }
 
         int content_length = 0;
-        for (const auto& line : lines) {
+        for (const auto &line : lines)
+        {
             std::string lower_line = toLower(line);
-            if (lower_line.find("content-length:") != std::string::npos) {
+            if (lower_line.find("content-length:") != std::string::npos)
+            {
                 size_t colon = line.find(':');
-                if (colon != std::string::npos) {
+                if (colon != std::string::npos)
+                {
                     content_length = std::stoi(line.substr(colon + 1));
                 }
             }
@@ -108,23 +124,34 @@ void Server::_listen() {
 
         std::string response;
 
-        try {
-            if (method == "GET") {
+        try
+        {
+            if (method == "GET")
+            {
                 response = handleGetRequest(path, queryParams);
-            } else if (method == "POST") {
+            }
+            else if (method == "POST")
+            {
                 int total_size = (int)header_end + 4 + content_length;
                 auto full_request = readFullRequest(client_fd, total_size, buffer, bytes_received);
 
-                if ((int)full_request.size() < total_size) {
+                if ((int)full_request.size() < total_size)
+                {
                     response = createHttpResponse("{\"error\":\"Incomplete POST body received\"}", "application/json", 400, "Bad Request");
-                } else {
+                }
+                else
+                {
                     std::vector<char> body(full_request.begin() + header_end + 4, full_request.begin() + header_end + 4 + content_length);
                     response = handleBinaryPostRequest(path, body);
                 }
-            } else {
+            }
+            else
+            {
                 response = createHttpResponse("{\"error\":\"405 Method Not Allowed\"}", "application/json", 405, "Method Not Allowed");
             }
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception &e)
+        {
             response = createHttpResponse("{\"error\":\"" + std::string(e.what()) + "\"}", "application/json", 500, "Internal Server Error");
         }
 
@@ -135,24 +162,34 @@ void Server::_listen() {
     close();
 }
 
-void Server::close(std::string reason) {
-    if (!reason.empty()) Error(reason.c_str());
-    if (m_ServerFD != INVALID_SOCKET) {
+void Server::close(std::string reason)
+{
+    if (!reason.empty())
+        Error(reason.c_str());
+    if (m_ServerFD != INVALID_SOCKET)
+    {
         closesocket(m_ServerFD);
     }
     WSACleanup();
 }
 
-std::string Server::getContentType(const std::string& path) {
-    if (path.find(".html") != std::string::npos) return "text/html";
-    if (path.find(".css") != std::string::npos) return "text/css";
-    if (path.find(".js") != std::string::npos) return "application/javascript";
-    if (path.find(".jpg") != std::string::npos) return "image/jpeg";
-    if (path.find(".png") != std::string::npos) return "image/png";
+std::string Server::getContentType(const std::string &path)
+{
+    if (path.find(".html") != std::string::npos)
+        return "text/html";
+    if (path.find(".css") != std::string::npos)
+        return "text/css";
+    if (path.find(".js") != std::string::npos)
+        return "application/javascript";
+    if (path.find(".jpg") != std::string::npos)
+        return "image/jpeg";
+    if (path.find(".png") != std::string::npos)
+        return "image/png";
     return "text/plain";
 }
 
-std::string Server::createHttpResponse(const std::string& body, const std::string& contentType, int statusCode, const std::string& statusMessage) {
+std::string Server::createHttpResponse(const std::string &body, const std::string &contentType, int statusCode, const std::string &statusMessage)
+{
     std::ostringstream oss;
     oss << "HTTP/1.1 " << statusCode << " " << statusMessage << "\r\n";
     oss << "Content-Type: " << contentType << "\r\n";
@@ -162,59 +199,90 @@ std::string Server::createHttpResponse(const std::string& body, const std::strin
     return oss.str();
 }
 
-std::string Server::handleGetRequest(const std::string& path, const std::unordered_map<std::string, std::string>& queryParams) {
-    if (path == "/api/data") {
-        if (m_LastPostedData.empty()) {
+std::string Server::handleGetRequest(const std::string &path, const std::unordered_map<std::string, std::string> &queryParams)
+{
+    if (path == "/api/data")
+    {
+        if (m_LastPostedData.empty())
+        {
             return createHttpResponse("{\"error\":\"No data posted yet\"}", "application/json", 404, "Not Found");
         }
         return createHttpResponse(m_LastPostedData, "application/json", 200, "OK");
-    } else if (path == "/") {
+    }
+    else if (path == "/")
+    {
         std::string content = readFile("./public/index.html");
         return content.empty() ? createHttpResponse("{\"error\":\"index.html not found\"}", "application/json", 404, "Not Found")
                                : createHttpResponse(content, "text/html", 200, "OK");
-    } else if (path == "/echo") {
+    }
+    else if (path == "/echo")
+    {
         std::string body = "{ \"queryParameters\": {";
         bool first = true;
-        for (const auto& param : queryParams) {
-            if (!first) body += ",";
+        for (const auto &param : queryParams)
+        {
+            if (!first)
+                body += ",";
             body += "\"" + param.first + "\":\"" + param.second + "\"";
             first = false;
         }
         body += "} }";
         return createHttpResponse(body, "application/json", 200, "OK");
-    } else if (path == "/welcome") {
+    }
+    else if (path == "/welcome")
+    {
         return createHttpResponse("{\"message\":\"Welcome to my server!\"}", "application/json", 200, "OK");
     }
     return createHttpResponse("{\"error\":\"404 Not Found\"}", "application/json", 404, "Not Found");
 }
 
-#include <filesystem>
-#include <fstream>
-
-std::string Server::handleBinaryPostRequest(const std::string& path, const std::vector<char>& body) {
+std::string Server::handleBinaryPostRequest(const std::string &path, const std::vector<char> &body)
+{
     static int counter = 0;
 
     std::string extension = "bin";
 
-    if (body.size() >= 4) {
-        if ((unsigned char)body[0] == 0xFF && (unsigned char)body[1] == 0xD8) {
+    if (body.size() >= 4)
+    {
+        if ((unsigned char)body[0] == 0xFF && (unsigned char)body[1] == 0xD8)
+        {
             extension = "jpg";
-        } else if ((unsigned char)body[0] == 0x50 && (unsigned char)body[1] == 0x4B) {
-            extension = "xlsx"; 
-        } else if (body[0] == 'P' && body[1] == 'K') {
-            extension = "zip"; 
-        } else if (body[0] == 0xEF && body[1] == 0xBB && body[2] == 0xBF) {
-            extension = "csv"; 
         }
-    
+        else if (body[0] == 0xEF && body[1] == 0xBB && body[2] == 0xBF)
+        {
+            extension = "csv";
+        }
+        else if ((unsigned char)body[0] == 0x25 && (unsigned char)body[1] == 0x50 && (unsigned char)body[2] == 0x44 && (unsigned char)body[3] == 0x46)
+        {
+            extension = "pdf";
+        }
+        else if (body[0] == 0x50 && body[1] == 0x4B &&
+                 body[2] == 0x03 && body[3] == 0x04)
+        {
+            std::string bodyStr(body.begin(), body.end());
+
+            if (bodyStr.find("word/document.xml") != std::string::npos)
+            {
+                extension = "docx";
+            }
+            else if (bodyStr.find("xl/workbook.xml") != std::string::npos)
+            {
+                extension = "xlsx";
+            }
+            else
+            {
+                extension = "zip";
+            }
+        }
     }
 
     std::string folder = "./uploads/" + extension;
-    std::filesystem::create_directories(folder); 
+    std::filesystem::create_directories(folder);
 
     std::string filename = folder + "/upload_" + std::to_string(counter++) + "." + extension;
     std::ofstream ofs(filename, std::ios::binary);
-    if (!ofs.is_open()) {
+    if (!ofs.is_open())
+    {
         return createHttpResponse("{\"error\":\"Failed to write file\"}", "application/json", 500, "Internal Server Error");
     }
 
@@ -226,11 +294,14 @@ std::string Server::handleBinaryPostRequest(const std::string& path, const std::
     return createHttpResponse(oss.str(), "application/json", 200, "OK");
 }
 
-std::unordered_map<std::string, std::string> Server::parseQueryParams(const std::string& query) {
+std::unordered_map<std::string, std::string> Server::parseQueryParams(const std::string &query)
+{
     std::unordered_map<std::string, std::string> params;
-    for (const auto& pair : split(query, '&')) {
+    for (const auto &pair : split(query, '&'))
+    {
         auto kv = split(pair, '=');
-        if (kv.size() == 2) {
+        if (kv.size() == 2)
+        {
             params[kv[0]] = kv[1];
         }
     }

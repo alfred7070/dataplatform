@@ -4,9 +4,17 @@
 #include <WinSock2.h>
 #include <unordered_map>
 #include <string>
-#include <vector>             // Required for binary body (std::vector<char>)
+#include <vector>           
 #include "utils.hpp"
 #include "log.hpp"
+
+#include <sstream>
+#include <fstream>
+#include <filesystem>
+#include <vector>
+
+#include <filesystem>
+#include <fstream>
 
 struct ServerConfig {
     enum AddressFamilies { IPv4 = AF_INET, IPv6 = AF_INET6 };
