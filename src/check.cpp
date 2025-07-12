@@ -23,7 +23,7 @@ std::string Check::check_data(const std::string &path, const std::vector<char> &
 
     if (extension == "csv")
     {
-        convert.convert_type(filename);
+        convert.read_csv(filename);
     }
 
     std::ostringstream oss;
