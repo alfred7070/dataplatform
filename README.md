@@ -34,8 +34,8 @@ cmake --build .
 - ./dataplatform
 
 ### Sample response
-```{
+```
   "status": "file saved",
   "filename": "./uploads/csv/upload_0.csv",
   "size": 1234
-}
+```
