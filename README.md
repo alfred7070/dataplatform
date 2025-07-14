@@ -24,7 +24,7 @@ A lightweight C++ server that accepts file uploads via HTTP POST requests, detec
 
 ```bash
 git clone https://github.com/kanyutu707/dataplatform.git
-cd yourproject
+cd dataplatform
 mkdir build && cd build
 cmake ..
 cmake --build .
@@ -38,4 +38,4 @@ cmake --build .
   "status": "file saved",
   "filename": "./uploads/csv/upload_0.csv",
   "size": 1234
-}```
+}
