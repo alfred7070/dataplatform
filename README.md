@@ -23,7 +23,7 @@ A lightweight C++ server that accepts file uploads via HTTP POST requests, detec
 ### Steps
 
 ```bash
-git clone https://github.com/kanyutu707/dataplatform.git
+git clone https://github.com/alfred7070/dataplatform.git
 cd dataplatform
 mkdir build && cd build
 cmake ..
